@@ -27,26 +27,31 @@ class Environment(object):
         # TODO: implement
         return None
 class ContGrid(Environment):
-    observation_space = ObservationSpace(2,lambda: np.random.rand(2))
+    max_s = 1
+    observation_space = ObservationSpace(2,lambda: np.random.rand(2)*ContGrid.max_s)
     def __init__(self,n_actions = 4):
         super().__init__(n_actions)
-        self.goal = np.array([.5,.5])
-        self.goal_size = .15
+        self.goal = np.array([.1,.5])*self.max_s
+        print(self.goal)
+        self.goal_size = .15*self.max_s
         self.reset()
         self.rad_inc = 2*np.pi/n_actions
         self.action_space = ActionSpace(n_actions)
-        self.radius = .1
+        self.radius = .1*self.max_s
     def reset(self):
         #self.s = np.asarray([.1,.1])
-        self.s = np.random.rand(2)
+        self.s = np.random.rand(2)*self.max_s
         return self.s
     def get_transition(self,s,a):
         term = False
         r = 0
-        sPrime =  s + np.asarray([self.radius*np.cos(self.rad_inc*a),self.radius*np.sin(self.rad_inc*a)]) +np.random.randn(2)*self.radius/10
-        if np.any(sPrime > 1) or np.any(sPrime < 0):
-            sPrime[sPrime >= 1] = 1-.01
-            sPrime[sPrime < 0] = 0+.01
+        sPrime =  s \
+            + np.asarray([self.radius*np.cos(self.rad_inc*a), \
+                self.radius*np.sin(self.rad_inc*a)]) \
+            +np.random.randn(2)*self.radius/10
+        if np.any(sPrime > self.max_s) or np.any(sPrime < 0):
+            sPrime[sPrime >= self.max_s] = self.max_s-.01*self.max_s
+            sPrime[sPrime < 0] = 0+.01*self.max_s
             r = -1.0
             #term = True
         elif np.all(sPrime > self.goal) and np.all(sPrime < (self.goal+self.goal_size)):
