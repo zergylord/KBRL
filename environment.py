@@ -52,11 +52,11 @@ class ContGrid(Environment):
         if np.any(sPrime > self.max_s) or np.any(sPrime < 0):
             sPrime[sPrime >= self.max_s] = self.max_s-.01*self.max_s
             sPrime[sPrime < 0] = 0+.01*self.max_s
-            r = -1.0
-            #term = True
+            #r = -1.0
         elif np.all(sPrime > self.goal) and np.all(sPrime < (self.goal+self.goal_size)):
-            r = 1
-            term = True
+            pass
+            #r = 1
+            #term = True
         return sPrime.copy(),r,term,False
     def step(self,a):
         self.s,r,term,_ = self.get_transition(self.s,a)

@@ -3,39 +3,44 @@ import numpy as np
 import matplotlib.pyplot as plt
 from environment import ContGrid
 r_max = 1.0
-cutoff = 1e-4
+cutoff = 1e1
 env = ContGrid()
 n_actions = 4
 s_dim = 2
 gamma = .95
-b = .01 #*env.max_s**2
+b = .05 #*env.max_s**2
 n_episodes = 5000
 if n_episodes == -1:
     n_mem = 100
 else:
     n_mem = n_episodes*250
 def value_iteration(Theta,R,NT,V,tot_sim=None):
-    #A x AM
-    Q = np.matmul(Theta,np.expand_dims(R+gamma*NT*V,-1)).squeeze()
+    #(A x AM x M)(A x M x 1) --> (A x AM)
+    Q = np.matmul(Theta,np.expand_dims(R+gamma*NT*V,-1)).squeeze(-1)
     if tot_sim is not None:
+        #(A x AM)
         Q[tot_sim < cutoff] = r_max
+    #tie breaking------------------
     tied = np.max(Q,0)==Q
     two_or_more = tied.sum(0)>1
-    best_act = np.squeeze(np.argmax(Q,0))
+    best_act = np.argmax(Q,0)
     if two_or_more.sum()>0:
         for i in np.nonzero(two_or_more)[0]:
             best_act[i] = np.random.choice(np.arange(n_actions)[tied[:,i]]) 
+    #------------------------------
+    #best_act = np.squeeze(np.argmax(Q,0))
     return np.max(Q,0),best_act
 def train(S,R,NT,SPrime):
     n_mem = S.shape[1] #A x M x Z
-    raw = rbf(np.tile(SPrime.reshape([n_actions*n_mem,s_dim]),[n_actions,1,1]),S,b,normalize=False)
     #A x AM x M
+    raw = rbf(np.tile(SPrime.reshape([n_actions*n_mem,s_dim]),[n_actions,1,1]),S,b,normalize=False)
+    #A x AM
     tot_sim = raw.sum(-1)
     Theta = rbf(np.tile(SPrime.reshape([n_actions*n_mem,s_dim]),[n_actions,1,1]),S,b)
     V = np.zeros([n_actions,n_mem])
     change = np.inf
     count = 0
-    while change > 1:
+    while change > 1e-1 or count < 10:
     #for i in range(10):
         old_V = V.copy()
         V[:] = value_iteration(Theta,R,NT,V,tot_sim)[0].reshape([n_actions,-1])
@@ -44,9 +49,13 @@ def train(S,R,NT,SPrime):
     #print(count,change)
     return V,tot_sim
 def select_action(S,R,NT,V,s):
+    raw = rbf(np.tile(s,[n_actions,1,1]),S,b,normalize=False)
+    #A x 1 x M
+    tot_sim = raw.sum(-1)
     Theta = rbf(np.tile(s,[n_actions,1,1]),S,b)
-    _,act = value_iteration(Theta,R,NT,V)
-    return act
+    _,act = value_iteration(Theta,R,NT,V,tot_sim)
+    #return np.random.randint(4)
+    return np.squeeze(act)
 #hacky way to have dummys when uneven number of actions taken
 #huge states far far from everything 
 #S and SPrime different signs so 
@@ -84,22 +93,38 @@ while term_count < n_episodes:
         s = env.reset()
     #visualize
     i+=1
-    if i % 10 == 0:
+    if i % 100 == 0:
+        print(i)
         plt.figure(0)
         plt.clf()
-        plt.scatter(SPrime[:,:n_mem,0].flatten(),SPrime[:,:n_mem,1].flatten(),c=tot_sim.min(0))#V.flatten())
+        plt.scatter(SPrime[:,:n_mem,0].flatten(),SPrime[:,:n_mem,1].flatten(),c=tot_sim.mean(0))
+        #plt.scatter(SPrime[:,:n_mem,0].flatten(),SPrime[:,:n_mem,1].flatten(),c=V.flatten())
         plt.ylim((0,env.max_s))
         plt.xlim((0,env.max_s))
         plt.colorbar()
+
         plt.figure(1)
         plt.clf()
         cur_sim = tot_sim.mean(0).reshape([n_actions,-1])
         for action in range(n_actions):
             plt.subplot(2,2,action+1)
-            plt.scatter(SPrime[action,:n_mem,0].flatten(),SPrime[action,:n_mem,1].flatten(),c=cur_sim[action])#V[action])
+            #plt.scatter(SPrime[action,:n_mem,0].flatten(),SPrime[action,:n_mem,1].flatten(),c=cur_sim[action]<cutoff)
+            plt.scatter(SPrime[action,:n_mem,0].flatten(),SPrime[action,:n_mem,1].flatten(),c=V[action])
             plt.ylim((0,env.max_s))
             plt.xlim((0,env.max_s))
             plt.colorbar()
+
+        plt.figure(2)
+        plt.clf()
+        cur_sim = tot_sim.min(0).reshape([n_actions,-1])
+        for action in range(n_actions):
+            plt.subplot(2,2,action+1)
+            plt.scatter(SPrime[action,:n_mem,0].flatten(),SPrime[action,:n_mem,1].flatten(),c=cur_sim[action]<cutoff)
+            #plt.scatter(SPrime[action,:n_mem,0].flatten(),SPrime[action,:n_mem,1].flatten(),c=V[action])
+            plt.ylim((0,env.max_s))
+            plt.xlim((0,env.max_s))
+            plt.colorbar()
+
         plt.pause(.001)
 n_mem = counts.max()
 print(counts)
